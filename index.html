@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark-mode">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Personnel - Analytique V5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        /* VARIABLES CSS pour les thèmes */
+        :root {
+            /* Couleurs d'accent par défaut (Jaune) */
+            --accent-500: #F59E0B; /* yellow-500 */
+            --accent-600: #D97706; /* yellow-600 */
+            --accent-300: #FCD34D; /* yellow-300 */
+        }
+        .theme-blue {
+            --accent-500: #3B82F6; /* blue-500 */
+            --accent-600: #2563EB; /* blue-600 */
+            --accent-300: #60A5FA; /* blue-300 */
+        }
+        .theme-green {
+            --accent-500: #10B981; /* emerald-500 */
+            --accent-600: #059669; /* emerald-600 */
+            --accent-300: #34D399; /* emerald-300 */
+        }
+        .theme-rose {
+            --accent-500: #F472B6; /* rose-400 */
+            --accent-600: #EC4899; /* rose-500 */
+            --accent-300: #F8A1E3; /* rose-300 */
+        }
+
+        /* Utilisation des variables dans Tailwind */
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .bg-accent-500 { background-color: var(--accent-500); }
+        .hover\:bg-accent-600:hover { background-color: var(--accent-600); }
+        .text-accent-300 { color: var(--accent-300); }
+        .text-accent-500 { color: var(--accent-500); }
+        .border-accent-500 { border-color: var(--accent-500); }
+        .shadow-accent-500\/30:hover { box-shadow: 0 10px 15px -3px rgba(var(--accent-500), 0.3), 0 4px 6px -4px rgba(var(--accent-500), 0.3); }
+        
+        /* Styles spécifiques */
+        .task-done { text-decoration: line-through; opacity: 0.6; transition: all 0.3s ease; }
+        .grade-bar-container { height: 10px; background-color: #374151; border-radius: 5px; overflow: hidden; }
+        .grade-bar { height: 100%; transition: width 0.5s ease-in-out; background-color: var(--accent-500); }
+        .today { border: 2px solid var(--accent-500) !important; font-weight: bold; background-color: #111827 !important; }
+        #timer-display { font-size: 3rem; font-weight: 700; color: var(--accent-300); transition: color 0.5s; }
+        .modal { z-index: 1000; background-color: rgba(0, 0, 0, 0.75); }
+        
+        @keyframes pulse-accent { 0%, 100% { background-color: var(--accent-500); opacity: 1; } 50% { background-color: var(--accent-600); opacity: 0.5; } }
+        .active-task-indicator { 
+            animation: pulse-accent 1.5s infinite;
+            background-color: var(--accent-500) !important; /* S'assurer que le focus utilise la couleur du thème */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8">
+
+    <div id="loading-indicator" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50" role="alert" aria-live="assertive">
+        <div class="text-xl text-accent-300">
+            Chargement de la configuration...
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-300 mx-auto mt-2"></div>
+        </div>
+    </div>
+
+    <header class="mb-8">
+        <h1 class="text-4xl font-extrabold text-white tracking-tight">
+            Mon Dashboard Personnel
+        </h1>
+        <p class="mt-2 text-gray-400">
+            Gère tes notes, tes tâches, tes jours et ton temps de manière critique.
+        </p>
+        <div class="mt-4 text-sm bg-gray-800 p-3 rounded-lg shadow-inner">
+            <span class="font-medium text-accent-300">Bienvenue :</span>
+            <code id="user-display-name" class="block mt-1 text-gray-300 overflow-auto whitespace-nowrap">Chargement...</code>
+        </div>
+        <button id="request-notification-permission-btn" class="mt-4 bg-gray-700 hover:bg-gray-600 text-sm py-1 px-3 rounded-md transition duration-150">
+            Activer Notifications
+        </button>
+        <button id="open-settings-btn" class="mt-4 ml-4 bg-gray-700 hover:bg-gray-600 text-sm py-1 px-3 rounded-md transition duration-150">
+            ⚙️ Paramètres
+        </button>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center transition duration-300 hover:shadow-accent-500\/30">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Timer de Concentration</h2>
+            <p id="timer-status" class="text-lg mb-4 font-medium text-accent-500 text-center">Prêt pour le Travail (25 min)</p>
+            <p id="current-focus-display" class="text-sm text-gray-400 mb-2 h-4 overflow-hidden text-center">Aucun focus défini.</p>
+            
+            <div id="timer-display" class="mb-6">25:00</div>
+
+            <div class="flex space-x-4">
+                <button id="timer-start-pause-btn" class="bg-accent-500 hover:bg-accent-600 text-gray-900 font-bold py-3 px-6 rounded-full shadow-lg transition duration-150 transform hover:scale-105" aria-label="Démarrer ou mettre en pause le minuteur Pomodoro">Démarrer</button>
+                <button id="timer-reset-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-150 transform hover:scale-105" aria-label="Réinitialiser le minuteur">Réinitialiser</button>
+            </div>
+            
+            <button id="set-focus-btn" class="mt-4 text-sm text-blue-400 hover:text-blue-500">Associer à une tâche...</button>
+        </div>
+
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl transition duration-300 hover:shadow-accent-500\/30 xl:col-span-2">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Tâches à Faire</h2>
+            
+            <div class="flex mb-4">
+                <label for="todo-input" class="sr-only">Nouvelle tâche</label>
+                <input type="text" id="todo-input" class="flex-grow p-2 rounded-l-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none placeholder-gray-500" placeholder="Ajouter une tâche..." maxlength="100" aria-label="Champ de saisie pour une nouvelle tâche">
+                <button id="add-todo-btn" class="bg-accent-500 hover:bg-accent-600 text-gray-900 font-bold py-2 px-4 rounded-r-lg shadow-md transition duration-150 transform hover:scale-105" aria-label="Ajouter la nouvelle tâche">+</button>
+            </div>
+
+            <ul id="todo-list-container" class="space-y-2 max-h-56 overflow-y-auto pr-2" aria-live="polite">
+                </ul>
+            <p id="empty-list-message" class="text-gray-500 text-center mt-4 hidden">Rien à faire, le repos est mérité !</p>
+        </div>
+        
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl transition duration-300 hover:shadow-accent-500\/30">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Notes & Progrès</h2>
+            <div class="mb-4 p-3 bg-gray-700 rounded-lg text-center">
+                <p class="text-sm text-gray-400">Moyenne Générale Actuelle</p>
+                <p id="overall-gpa" class="text-4xl font-extrabold text-accent-300">--/20</p>
+            </div>
+
+            <div id="grades-container" class="space-y-4 max-h-56 overflow-y-auto pr-2">
+                <p id="no-grades-message" class="text-gray-500 text-center hidden">Ajoutez vos matières pour suivre vos notes.</p>
+            </div>
+            
+            <div class="mt-4 border-t border-gray-700 pt-4">
+                <button id="add-grade-btn-modal" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition duration-150" aria-label="Ajouter une nouvelle matière">Ajouter Matière</button>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl transition duration-300 hover:shadow-accent-500\/30">
+            <h2 class="text-2xl font-semibold mb-4 text-white flex justify-between items-center">Note Rapide
+                <span id="save-status" class="text-xs text-gray-500">Prêt</span>
+            </h2>
+            <label for="personal-note" class="sr-only">Zone de saisie pour note rapide</label>
+            <textarea id="personal-note" class="w-full h-48 p-3 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none resize-none placeholder-gray-500 transition duration-150" placeholder="Écris tes pensées ou rappels rapides ici." aria-label="Note rapide personnelle"></textarea>
+        </div>
+        
+        <div class="lg:col-span-2 xl:col-span-3 bg-gray-800 p-6 rounded-xl shadow-2xl transition duration-300 hover:shadow-accent-500\/30">
+            <h2 class="text-2xl font-semibold mb-4 text-white flex justify-between items-center">
+                Calendrier & Deadlines
+                <button id="add-deadline-btn-modal" class="text-sm bg-accent-500 hover:bg-accent-600 text-gray-900 font-bold py-1 px-3 rounded-full shadow-md transition duration-150" aria-label="Ajouter une nouvelle deadline">+ Deadline</button>
+            </h2>
+
+            <div class="text-center text-xl font-bold mb-4 text-white" id="month-year-display"></div>
+
+            <div class="grid grid-cols-7 text-center text-sm font-medium text-gray-400 mb-2">
+                <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span class="text-red-400">Sam</span><span class="text-red-400">Dim</span>
+            </div>
+            <div id="calendar-grid" class="grid grid-cols-7 gap-1">
+                </div>
+            
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <h3 class="text-xl font-semibold mb-2 text-white">Prochains Événements</h3>
+                <ul id="event-list" class="space-y-2">
+                    <li class="text-sm text-gray-500">Chargement des événements...</li>
+                </ul>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="settings-modal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+        <div class="modal-content bg-gray-800 p-6 rounded-xl shadow-2xl w-full">
+            <h3 class="text-2xl font-bold mb-4 text-white">⚙️ Paramètres de l'Application</h3>
+            
+            <div class="space-y-6">
+                <section>
+                    <h4 class="text-xl font-semibold mb-3 text-accent-300">Mon Nom</h4>
+                    <div>
+                        <label for="user-custom-name" class="block text-sm font-medium text-gray-300">Nom ou Surnom affiché</label>
+                        <input type="text" id="user-custom-name" class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none" placeholder="Ex: Lawali, Maman, Champion">
+                        <button id="save-user-name-btn" class="mt-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-lg transition duration-150">Enregistrer le Nom</button>
+                    </div>
+                </section>
+                
+                <section>
+                    <h4 class="text-xl font-semibold mb-3 text-accent-300">Couleur d'Accent (Thème)</h4>
+                    <div class="flex space-x-4">
+                        <button class="w-12 h-12 rounded-full border-4 border-transparent hover:border-white theme-selector bg-yellow-500" data-theme="theme-yellow" title="Jaune"></button>
+                        <button class="w-12 h-12 rounded-full border-4 border-transparent hover:border-white theme-selector bg-blue-500" data-theme="theme-blue" title="Bleu"></button>
+                        <button class="w-12 h-12 rounded-full border-4 border-transparent hover:border-white theme-selector bg-emerald-500" data-theme="theme-green" title="Vert"></button>
+                        <button class="w-12 h-12 rounded-full border-4 border-transparent hover:border-white theme-selector bg-rose-500" data-theme="theme-rose" title="Rose"></button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Le mode sombre (Dark Mode) reste actif pour le confort visuel.</p>
+                </section>
+            </div>
+
+            <div class="flex justify-end mt-6">
+                <button type="button" onclick="closeModal('settings-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-grade-modal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+        <div class="modal-content bg-gray-800 p-6 rounded-xl shadow-2xl w-full">
+            <h3 class="text-2xl font-bold mb-4 text-white">Ajouter une Nouvelle Matière</h3>
+            <form id="add-grade-form" class="space-y-4">
+                <div>
+                    <label for="new-grade-name" class="block text-sm font-medium text-gray-300">Nom de la Matière</label>
+                    <input type="text" id="new-grade-name" required class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none">
+                </div>
+                <div>
+                    <label for="new-grade-weight" class="block text-sm font-medium text-gray-300">Coefficient (Poids)</label>
+                    <input type="number" id="new-grade-weight" required min="1" value="3" class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none">
+                </div>
+                <div>
+                    <label for="new-grade-score" class="block text-sm font-medium text-gray-300">Note Actuelle (sur 20)</label>
+                    <input type="number" id="new-grade-score" required min="0" max="20" step="0.1" value="10.0" class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none">
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal('add-grade-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Annuler</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="add-deadline-modal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+        <div class="modal-content bg-gray-800 p-6 rounded-xl shadow-2xl w-full">
+            <h3 class="text-2xl font-bold mb-4 text-white">Ajouter une Nouvelle Deadline</h3>
+            <form id="add-deadline-form" class="space-y-4">
+                <div>
+                    <label for="new-deadline-description" class="block text-sm font-medium text-gray-300">Description</label>
+                    <input type="text" id="new-deadline-description" required class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none">
+                </div>
+                <div>
+                    <label for="new-deadline-date" class="block text-sm font-medium text-gray-300">Date (AAAA-MM-JJ)</label>
+                    <input type="date" id="new-deadline-date" required class="w-full p-3 mt-1 rounded-lg bg-gray-700 text-white border-2 border-gray-700 focus:border-accent-500 outline-none">
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal('add-deadline-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Annuler</button>
+                    <button type="submit" class="bg-accent-500 hover:bg-accent-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition duration-150">Planifier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="set-focus-modal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+        <div class="modal-content bg-gray-800 p-6 rounded-xl shadow-2xl w-full">
+            <h3 class="text-2xl font-bold mb-4 text-white">Choisir la Tâche en Cours (Focus)</h3>
+            <p class="text-sm text-gray-400 mb-4">Le temps Pomodoro sera crédité à cette tâche.</p>
+            <ul id="focus-task-list" class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                </ul>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="closeModal('set-focus-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Fermer</button>
+                <button type="button" id="clear-focus-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">Retirer le Focus</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+        /* =========================================================================
+         * GESTION DES PRÉFÉRENCES
+         * ========================================================================= */
+        
+        const DEFAULT_THEME = 'theme-yellow';
+        const DEFAULT_NAME = 'Utilisateur (ID: U_MAMAN_L_2025_42)';
+        const userDisplayName = document.getElementById('user-display-name');
+
+        function getPreferences() {
+            return {
+                theme: localStorage.getItem('userTheme') || DEFAULT_THEME,
+                name: localStorage.getItem('userName') || DEFAULT_NAME
+            };
+        }
+
+        function applyPreferences() {
+            const prefs = getPreferences();
+            
+            // 1. Appliquer le Thème
+            document.documentElement.className = 'dark-mode ' + prefs.theme;
+            
+            // 2. Afficher le Nom
+            userDisplayName.textContent = prefs.name;
+            const customNameInput = document.getElementById('user-custom-name');
+            if (customNameInput) {
+                customNameInput.value = prefs.name === DEFAULT_NAME ? '' : prefs.name;
+            }
+            
+            // 3. Mettre à jour la couleur du timer si nous sommes en mode 'work'
+            if (currentMode === 'work') {
+                 updateTimerColor(prefs.theme);
+            }
+        }
+
+        function saveTheme(theme) {
+            localStorage.setItem('userTheme', theme);
+            applyPreferences();
+        }
+
+        function saveName() {
+            const inputElement = document.getElementById('user-custom-name');
+            const newName = inputElement.value.trim();
+            const finalName = newName === '' ? DEFAULT_NAME : newName;
+            localStorage.setItem('userName', finalName);
+            applyPreferences();
+            alert(`Nom mis à jour : ${finalName}`);
+        }
+        
+        function updateTimerColor(theme) {
+            let color;
+            if (theme === 'theme-blue') color = '#60A5FA';
+            else if (theme === 'theme-green') color = '#34D399';
+            else if (theme === 'theme-rose') color = '#F8A1E3';
+            else color = '#FCD34D'; // Yellow default
+            
+            display.style.color = color;
+        }
+        
+        /* =========================================================================
+         * GESTION GÉNÉRALE DES MODALES
+         * ========================================================================= */
+        
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.getElementById(modalId).classList.add('flex');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.getElementById(modalId).classList.remove('flex');
+        }
+        
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal(modal.id);
+                }
+            });
+        });
+        
+        /* =========================================================================
+         * LOGIQUE DU TIMER POMODORO & NOTIFICATIONS
+         * ========================================================================= */
+
+        const WORK_TIME = 25 * 60; 
+        const SHORT_BREAK_TIME = 5 * 60; 
+        const LONG_BREAK_TIME = 15 * 60; 
+        const POMODORO_CYCLES = 4; 
+        const POMODORO_DURATION_MINUTES = WORK_TIME / 60;
+
+        let timer; 
+        let isRunning = false;
+        let timeLeft = WORK_TIME;
+        let currentMode = 'work'; 
+        let pomodoroCount = 0; 
+        let currentFocusId = null; 
+
+        const display = document.getElementById('timer-display');
+        const statusText = document.getElementById('timer-status');
+        const startPauseBtn = document.getElementById('timer-start-pause-btn');
+        const currentFocusDisplay = document.getElementById('current-focus-display');
+
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                alert("Ce navigateur ne supporte pas les notifications.");
+                return;
+            }
+            
+            Notification.requestPermission().then(permission => {
+                const btn = document.getElementById('request-notification-permission-btn');
+                if (permission === "granted") {
+                    btn.textContent = 'Notifications ACTIVES';
+                    btn.disabled = true;
+                } else if (permission === "denied") {
+                    btn.textContent = 'Notifications BLOQUÉES';
+                    btn.disabled = true;
+                } else {
+                    alert("Les notifications ont été refusées. Le minuteur utilisera des alertes simples.");
+                }
+            });
+        }
+        
+        function showNotification(title, body) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: body, icon: 'https://img.icons8.com/color/48/000000/hourglass-time-delay.png' });
+            } else {
+                alert(title + ": " + body);
+            }
+        }
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.title = `(${minutes}:${seconds < 10 ? '0' : ''}${seconds}) - Dashboard`; 
+            display.textContent = `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
+        
+        function updateFocusDisplay() {
+            const tasks = getTasks();
+            const focusTask = tasks.find(t => t.id === currentFocusId);
+            currentFocusDisplay.textContent = focusTask ? `Focus: ${focusTask.text}` : 'Aucun focus défini.';
+        }
+
+        function creditFocusTime() {
+            if (currentFocusId) {
+                const tasks = getTasks();
+                const taskIndex = tasks.findIndex(t => t.id === currentFocusId);
+                if (taskIndex !== -1) {
+                    tasks[taskIndex].timeSpent = (tasks[taskIndex].timeSpent || 0) + POMODORO_DURATION_MINUTES;
+                    saveTasks(tasks);
+                    renderTasks(); 
+                    showNotification("Cycle Terminé !", `${POMODORO_DURATION_MINUTES} minutes créditées à "${tasks[taskIndex].text}".`);
+                }
+            }
+        }
+
+        function changeMode() {
+            if (currentMode === 'work') {
+                creditFocusTime();
+                pomodoroCount++;
+                if (pomodoroCount % POMODORO_CYCLES === 0) {
+                    currentMode = 'long-break';
+                    timeLeft = LONG_BREAK_TIME;
+                    statusText.textContent = `Longue Pause (${LONG_BREAK_TIME / 60} min) - ${pomodoroCount} cycles`;
+                    display.style.color = '#34D399'; // Vert pour Longue Pause
+                    showNotification("Longue Pause !", "Félicitations pour 4 cycles. Repos bien mérité !");
+                } else {
+                    currentMode = 'short-break';
+                    timeLeft = SHORT_BREAK_TIME;
+                    statusText.textContent = `Petite Pause (${SHORT_BREAK_TIME / 60} min) - ${pomodoroCount} cycles`;
+                    display.style.color = '#60A5FA'; // Bleu pour Petite Pause
+                    showNotification("Petite Pause !", "Lève-toi, marche un peu. Tu reprends dans 5 minutes.");
+                }
+            } else {
+                currentMode = 'work';
+                timeLeft = WORK_TIME;
+                statusText.textContent = `Concentration #${pomodoroCount + 1} (${WORK_TIME / 60} min)`;
+                updateTimerColor(getPreferences().theme); // Réapplique la couleur du thème pour le travail
+                showNotification("Retour au Travail !", "C'est l'heure de se concentrer à nouveau. Bonne session.");
+            }
+            startTimer();
+            updateDisplay();
+        }
+
+        function countdown() {
+            timeLeft--;
+            updateDisplay();
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                isRunning = false;
+                startPauseBtn.textContent = 'Démarrer';
+                changeMode(); 
+            }
+        }
+
+        function startTimer() {
+            if (currentMode === 'work' && !currentFocusId) {
+                const confirmation = confirm("Attention : Tu n'as pas associé de tâche à ce cycle. Le temps ne sera pas enregistré. Voulez-vous continuer quand même ?");
+                if (!confirmation) return;
+            }
+            if (!isRunning) {
+                isRunning = true;
+                startPauseBtn.textContent = 'Pause';
+                timer = setInterval(countdown, 1000);
+            } else {
+                isRunning = false;
+                startPauseBtn.textContent = 'Continuer';
+                clearInterval(timer);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            isRunning = false;
+            pomodoroCount = 0;
+            currentMode = 'work';
+            timeLeft = WORK_TIME;
+            startPauseBtn.textContent = 'Démarrer';
+            statusText.textContent = `Prêt pour le Travail (${WORK_TIME / 60} min)`;
+            updateTimerColor(getPreferences().theme); 
+            document.title = `Dashboard Étudiant`;
+            updateDisplay();
+        }
+        
+        document.getElementById('timer-start-pause-btn').addEventListener('click', startTimer);
+        document.getElementById('timer-reset-btn').addEventListener('click', resetTimer);
+        document.getElementById('request-notification-permission-btn').addEventListener('click', requestNotificationPermission);
+        
+        /* =========================================================================
+         * LOGIQUE DE LA NOTE RAPIDE
+         * ========================================================================= */
+        const personalNote = document.getElementById('personal-note');
+        const saveStatus = document.getElementById('save-status');
+        let saveTimeout;
+
+        function saveNote() {
+            localStorage.setItem('studentDashboardNote', personalNote.value);
+            saveStatus.textContent = 'Sauvegardé !';
+            saveStatus.classList.add('text-green-400');
+            setTimeout(() => {
+                saveStatus.textContent = 'Prêt';
+                saveStatus.classList.remove('text-green-400');
+            }, 1500);
+        }
+
+        function handleNoteInput() {
+            clearTimeout(saveTimeout); 
+            saveStatus.textContent = 'Écriture...';
+            saveTimeout = setTimeout(saveNote, 500); 
+        }
+
+        /* =========================================================================
+         * LOGIQUE DE LA LISTE DE TÂCHES (COMPLET)
+         * ========================================================================= */
+
+        const todoInput = document.getElementById('todo-input');
+        const addTodoBtn = document.getElementById('add-todo-btn');
+        const todoListContainer = document.getElementById('todo-list-container');
+        const emptyListMessage = document.getElementById('empty-list-message');
+        
+        function getTasks() {
+            const tasks = localStorage.getItem('studentDashboardTasks');
+            return tasks ? JSON.parse(tasks) : [];
+        }
+
+        function saveTasks(tasks) {
+            localStorage.setItem('studentDashboardTasks', JSON.stringify(tasks));
+        }
+        
+        function updateEmptyMessage(tasks) {
+            tasks.length === 0 ? emptyListMessage.classList.remove('hidden') : emptyListMessage.classList.add('hidden');
+        }
+        
+        function formatTime(totalMinutes) {
+            if (!totalMinutes || totalMinutes === 0) return '';
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            let output = ' ('
+            if (hours > 0) output += `${hours}h `;
+            if (minutes > 0) output += `${minutes}m`;
+            return output.trim() + ')';
+        }
+
+        function renderTasks() {
+            const tasks = getTasks();
+            todoListContainer.innerHTML = ''; 
+
+            tasks.forEach((task, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'flex items-center justify-between p-3 bg-gray-700 rounded-lg shadow-sm transition duration-150 transform hover:scale-[1.01] group';
+
+                const focusIndicator = document.createElement('div');
+                focusIndicator.className = 'w-2 h-2 rounded-full mr-3 ' + (task.id === currentFocusId ? 'active-task-indicator' : 'bg-gray-500');
+
+                const textContainer = document.createElement('span');
+                textContainer.className = 'flex-grow cursor-pointer p-1 flex items-center';
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = task.text;
+                
+                const timeSpan = document.createElement('span');
+                timeSpan.textContent = formatTime(task.timeSpent);
+                timeSpan.className = 'text-xs text-accent-300 ml-1 font-mono'; /* Utilisation du thème */
+                
+                textContainer.appendChild(textSpan);
+                textContainer.appendChild(timeSpan);
+
+                if (task.completed) {
+                    textContainer.classList.add('task-done');
+                }
+                textContainer.addEventListener('click', () => toggleComplete(index));
+
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition duration-300';
+                
+                const editBtn = document.createElement('button');
+                editBtn.innerHTML = '✎';
+                editBtn.className = 'text-blue-400 hover:text-blue-500 p-1 text-sm';
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    editTask(index);
+                });
+                
+                if ((task.timeSpent || 0) >= POMODORO_DURATION_MINUTES) {
+                    const deCreditBtn = document.createElement('button');
+                    deCreditBtn.innerHTML = `-${POMODORO_DURATION_MINUTES}m`;
+                    deCreditBtn.className = 'text-red-400 hover:text-red-500 p-1 text-xs';
+                    deCreditBtn.title = `Retirer ${POMODORO_DURATION_MINUTES} minutes`;
+                    deCreditBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deCreditTime(index);
+                    });
+                    actionsDiv.appendChild(deCreditBtn);
+                }
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.className = 'text-red-400 hover:text-red-600 p-1';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteTask(index);
+                });
+
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+
+                listItem.appendChild(focusIndicator);
+                listItem.appendChild(textContainer);
+                listItem.appendChild(actionsDiv);
+                todoListContainer.appendChild(listItem);
+            });
+
+            updateEmptyMessage(tasks);
+        }
+
+        function addTask() {
+            const text = todoInput.value.trim();
+            if (text === '') return; 
+            const tasks = getTasks();
+            const newId = new Date().getTime(); 
+            tasks.push({ id: newId, text: text, completed: false, timeSpent: 0 });
+            saveTasks(tasks);
+            todoInput.value = ''; 
+            renderTasks();
+        }
+        
+        function editTask(index) {
+            const tasks = getTasks();
+            const currentText = tasks[index].text;
+            const newText = prompt("Modifier la tâche :", currentText);
+            
+            if (newText && newText.trim() !== "" && newText.trim() !== currentText) {
+                tasks[index].text = newText.trim();
+                saveTasks(tasks);
+                renderTasks();
+                updateFocusDisplay();
+            }
+        }
+        
+        function deCreditTime(index) {
+            const tasks = getTasks();
+            const task = tasks[index];
+            if (task.timeSpent >= POMODORO_DURATION_MINUTES) {
+                task.timeSpent = Math.max(0, task.timeSpent - POMODORO_DURATION_MINUTES);
+                saveTasks(tasks);
+                renderTasks();
+                alert(`Le temps de travail pour "${task.text}" a été dé-crédité de ${POMODORO_DURATION_MINUTES} minutes.`);
+            }
+        }
+
+        function toggleComplete(index) {
+            const tasks = getTasks();
+            if (tasks[index]) {
+                tasks[index].completed = !tasks[index].completed;
+                if (tasks[index].id === currentFocusId && tasks[index].completed) {
+                    currentFocusId = null;
+                    updateFocusDisplay();
+                }
+                saveTasks(tasks);
+                renderTasks();
+            }
+        }
+
+        function deleteTask(index) {
+            if (confirm("Êtes-vous sûr de vouloir supprimer cette tâche ?")) {
+                const tasks = getTasks();
+                if (tasks[index].id === currentFocusId) {
+                    currentFocusId = null;
+                    updateFocusDisplay();
+                }
+                tasks.splice(index, 1); 
+                saveTasks(tasks);
+                renderTasks();
+            }
+        }
+        
+        function renderFocusModal() {
+            const tasks = getTasks().filter(t => !t.completed);
+            const list = document.getElementById('focus-task-list');
+            list.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                list.innerHTML = '<li class="text-gray-500 text-center py-4">Pas de tâches non complétées. Ajoutez-en !</li>';
+                document.getElementById('clear-focus-btn').classList.add('hidden');
+                return;
+            }
+            
+            document.getElementById('clear-focus-btn').classList.remove('hidden');
+
+            tasks.forEach(t => {
+                const listItem = document.createElement('li');
+                listItem.className = 'flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition duration-150';
+                
+                const isSelected = t.id === currentFocusId;
+                listItem.classList.toggle('bg-blue-900/50', isSelected);
+
+                listItem.innerHTML = `
+                    <span>${t.text} ${formatTime(t.timeSpent)}</span>
+                    <button class="text-sm ${isSelected ? 'text-accent-300' : 'text-blue-400'} font-bold" data-task-id="${t.id}">
+                        ${isSelected ? 'FOCUS ACTIF' : 'Choisir'}
+                    </button>
+                `;
+                
+                listItem.querySelector('button').addEventListener('click', (e) => {
+                    const taskId = parseInt(e.target.dataset.taskId);
+                    currentFocusId = taskId;
+                    updateFocusDisplay();
+                    renderTasks();
+                    closeModal('set-focus-modal');
+                });
+                
+                list.appendChild(listItem);
+            });
+            
+            openModal('set-focus-modal');
+        }
+        
+        document.getElementById('set-focus-btn').addEventListener('click', renderFocusModal);
+        document.getElementById('clear-focus-btn').addEventListener('click', () => {
+            currentFocusId = null;
+            updateFocusDisplay();
+            renderTasks();
+            closeModal('set-focus-modal');
+        });
+
+        addTodoBtn.addEventListener('click', addTask);
+        todoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+
+        /* =========================================================================
+         * LOGIQUE DES NOTES ET DU CALCUL DE LA MOYENNE (COMPLET)
+         * ========================================================================= */
+        
+        const gradesContainer = document.getElementById('grades-container');
+        const overallGpaDisplay = document.getElementById('overall-gpa');
+
+        function getDefaultGrades() { return [{ id: 1, name: 'Algorithmique (INF101)', grade: 16.2, weight: 5 }, { id: 2, name: 'Analyse (MAT105)', grade: 11.0, weight: 4 }, ]; }
+        function getGrades() { const gradesData = localStorage.getItem('studentDashboardGrades'); return gradesData ? JSON.parse(gradesData) : getDefaultGrades(); }
+        function saveGrades(grades) { localStorage.setItem('studentDashboardGrades', JSON.stringify(grades)); }
+        function calculateOverallGPA(grades) { if (grades.length === 0) return { gpa: 0, totalWeight: 0 }; let totalScore = 0; let totalWeight = 0; grades.forEach(g => { totalScore += parseFloat(g.grade) * parseInt(g.weight); totalWeight += parseInt(g.weight); }); const gpa = totalWeight > 0 ? (totalScore / totalWeight) : 0; return { gpa: gpa.toFixed(1), totalWeight: totalWeight }; }
+
+
+        function createGradeElement(gradeItem, index) {
+            const gradeContainer = document.createElement('div');
+            gradeContainer.className = 'space-y-1 group';
+            const percentage = (gradeItem.grade / 20) * 100;
+            let barColor = percentage >= 75 ? 'bg-green-500' : (percentage >= 50 ? 'bg-accent-500' : 'bg-red-500'); /* Utilisation du thème pour la moyenne */
+            
+            gradeContainer.innerHTML = `
+                <div class="flex justify-between items-center text-sm font-medium">
+                    <span title="Coefficient: ${gradeItem.weight}">${gradeItem.name} (Coef: ${gradeItem.weight})</span>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" min="0" max="20" step="0.1" value="${gradeItem.grade}" data-index="${index}" class="w-16 text-right bg-gray-700 text-accent-300 rounded-md p-1 focus:outline-none focus:ring-1 focus:ring-accent-500" aria-label="Note pour ${gradeItem.name}"/>
+                        <div class="flex opacity-0 group-hover:opacity-100 transition duration-300">
+                            <button class="text-blue-400 hover:text-blue-500 text-xs px-1" onclick="modifyGrade(${index})">✎</button>
+                            <button class="text-red-400 hover:text-red-500 text-xs px-1" onclick="deleteGrade(${index})">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grade-bar-container">
+                    <div class="grade-bar ${barColor}" style="width: ${percentage}%;"></div>
+                </div>
+            `;
+            return gradeContainer;
+        }
+
+        function renderGrades() {
+            const grades = getGrades();
+            gradesContainer.innerHTML = '';
+            
+            if (grades.length === 0) {
+                gradesContainer.innerHTML = '<p class="text-gray-500 text-center">Ajoutez vos matières pour suivre vos notes.</p>';
+                overallGpaDisplay.textContent = "--/20";
+                return;
+            }
+            grades.forEach((gradeItem, index) => {
+                gradesContainer.appendChild(createGradeElement(gradeItem, index));
+            });
+            gradesContainer.querySelectorAll('input[type="number"]').forEach(input => {
+                input.addEventListener('change', handleGradeChange);
+                input.addEventListener('focus', (e) => e.target.select()); 
+            });
+            const { gpa } = calculateOverallGPA(grades);
+            overallGpaDisplay.textContent = `${gpa}/20`;
+        }
+
+        function handleGradeChange(event) {
+            let newGrade = parseFloat(event.target.value);
+            const index = parseInt(event.target.dataset.index);
+            if (isNaN(newGrade) || newGrade < 0) newGrade = 0;
+            if (newGrade > 20) newGrade = 20;
+            event.target.value = newGrade.toFixed(1); 
+            const grades = getGrades();
+            grades[index].grade = newGrade;
+            saveGrades(grades);
+            renderGrades(); 
+        }
+        
+        window.modifyGrade = function(index) {
+            const grades = getGrades();
+            const current = grades[index];
+            const newName = prompt(`Modifier le nom de la matière (Actuel: ${current.name}) :`, current.name);
+            if (newName === null) return; 
+            const newWeight = prompt(`Modifier le Coefficient (Actuel: ${current.weight}) :`, current.weight);
+            if (newWeight === null) return; 
+            const finalWeight = parseInt(newWeight);
+            if (newName.trim() !== "") { grades[index].name = newName.trim(); }
+            if (!isNaN(finalWeight) && finalWeight > 0) { grades[index].weight = finalWeight; }
+            saveGrades(grades);
+            renderGrades();
+        };
+
+        window.deleteGrade = function(index) {
+            if (confirm("Êtes-vous sûr de vouloir supprimer cette matière ?")) {
+                const grades = getGrades();
+                grades.splice(index, 1); 
+                saveGrades(grades);
+                renderGrades();
+            }
+        };
+
+        document.getElementById('add-grade-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('new-grade-name').value.trim();
+            const weight = parseInt(document.getElementById('new-grade-weight').value);
+            const grade = parseFloat(document.getElementById('new-grade-score').value);
+            
+            if (!name || isNaN(weight) || weight <= 0 || isNaN(grade) || grade < 0 || grade > 20) {
+                alert("Veuillez vérifier les valeurs entrées.");
+                return;
+            }
+            
+            const grades = getGrades();
+            const newId = new Date().getTime(); 
+            grades.push({ id: newId, name: name, grade: grade.toFixed(1), weight: weight });
+            saveGrades(grades);
+            renderGrades();
+            closeModal('add-grade-modal');
+            document.getElementById('add-grade-form').reset();
+        });
+
+        document.getElementById('add-grade-btn-modal').addEventListener('click', () => openModal('add-grade-modal'));
+
+
+        /* =========================================================================
+         * LOGIQUE DU CALENDRIER ET DES DEADLINES (COMPLET)
+         * ========================================================================= */
+        
+        const calendarGrid = document.getElementById('calendar-grid');
+        const monthYearDisplay = document.getElementById('month-year-display');
+        const eventList = document.getElementById('event-list');
+        const TODAY = new Date();
+
+        function getDeadlines() { const deadlines = localStorage.getItem('studentDashboardDeadlines'); return deadlines ? JSON.parse(deadlines) : []; }
+        function saveDeadlines(deadlines) { localStorage.setItem('studentDashboardDeadlines', JSON.stringify(deadlines)); renderCalendar(); }
+        
+        function renderCalendar() {
+            calendarGrid.innerHTML = '';
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const deadlines = getDeadlines();
+
+            const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+            monthYearDisplay.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            const startDayIndex = (firstDayOfMonth.getDay() + 6) % 7; 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < startDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'p-2 text-gray-700';
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'p-2 rounded-lg cursor-pointer hover:bg-gray-700 transition duration-150 text-center relative';
+                dayCell.innerHTML = `<span class="font-bold">${day}</span>`;
+                
+                const eventsOnDay = deadlines.filter(d => {
+                    const deadlineDate = new Date(d.date);
+                    return deadlineDate.getFullYear() === year && deadlineDate.getMonth() === month && deadlineDate.getDate() === day;
+                });
+                
+                if (day === TODAY.getDate() && month === TODAY.getMonth() && year === TODAY.getFullYear()) {
+                    dayCell.classList.add('today');
+                }
+                
+                if (eventsOnDay.length > 0) {
+                    dayCell.classList.add('has-event');
+                    dayCell.innerHTML += `<div class="event-dot" style="background-color: var(--accent-500);"></div>`; 
+                }
+                
+                calendarGrid.appendChild(dayCell);
+                dayCell.addEventListener('click', () => showDayEvents(day, month, year, eventsOnDay));
+            }
+            renderUpcomingEvents(deadlines);
+        }
+
+        function renderUpcomingEvents(deadlines) {
+            eventList.innerHTML = '';
+            const now = new Date();
+            
+            const upcomingEvents = deadlines
+                .filter(d => {
+                    const deadlineDate = new Date(d.date + "T00:00:00"); 
+                    return deadlineDate >= now || deadlineDate.toDateString() === now.toDateString();
+                })
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (upcomingEvents.length === 0) {
+                eventList.innerHTML = '<li class="text-sm text-gray-500">Aucune deadline planifiée pour l\'instant.</li>';
+                return;
+            }
+
+            upcomingEvents.slice(0, 5).forEach(e => {
+                const date = new Date(e.date + "T00:00:00"); 
+                const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+                
+                const listItem = document.createElement('li');
+                listItem.className = 'text-sm text-accent-300';
+                listItem.textContent = `📅 ${dateStr} : ${e.description}`;
+                eventList.appendChild(listItem);
+            });
+        }
+        
+        function showDayEvents(day, month, year, events) {
+            let message = `Événements pour le ${day}/${month + 1}/${year}:\n\n`;
+            if (events.length === 0) {
+                message += "Aucune deadline ce jour-là. Voulez-vous en ajouter une ?";
+                const add = confirm(message);
+                if (add) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    document.getElementById('new-deadline-date').value = dateStr;
+                    openModal('add-deadline-modal');
+                }
+            } else {
+                events.forEach(e => {
+                    message += `- ${e.description}\n`;
+                });
+                alert(message);
+            }
+        }
+
+        document.getElementById('add-deadline-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const description = document.getElementById('new-deadline-description').value.trim();
+            const dateInput = document.getElementById('new-deadline-date').value.trim();
+            
+            if (!description || !dateInput) {
+                alert("Veuillez remplir tous les champs.");
+                return;
+            }
+
+            const date = new Date(dateInput);
+            if (isNaN(date.getTime())) {
+                alert("Format de date invalide.");
+                return;
+            }
+
+            const deadlines = getDeadlines();
+            deadlines.push({ date: dateInput, description: description });
+            saveDeadlines(deadlines);
+            closeModal('add-deadline-modal');
+            document.getElementById('add-deadline-form').reset();
+        });
+
+        /* =========================================================================
+         * INITIALISATION GLOBALE
+         * ========================================================================= */
+        document.addEventListener('DOMContentLoaded', () => {
+            // 0. Appliquer les préférences au plus tôt (Nom & Thème)
+            applyPreferences();
+
+            // 1. Initialisation de l'affichage
+            document.getElementById('loading-indicator').classList.add('hidden');
+            
+            // 2. Initialisation de la Note Rapide
+            const savedNote = localStorage.getItem('studentDashboardNote');
+            if (savedNote) { personalNote.value = savedNote; }
+            personalNote.addEventListener('input', handleNoteInput);
+
+            // 3. Rendu initial des données
+            renderTasks();
+            renderGrades();
+            renderCalendar();
+            
+            // 4. Écouteurs pour les Paramètres
+            document.getElementById('open-settings-btn').addEventListener('click', () => openModal('settings-modal'));
+            
+            // Thèmes
+            document.querySelectorAll('.theme-selector').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    saveTheme(btn.dataset.theme);
+                });
+            });
+            
+            // Nom Utilisateur
+            document.getElementById('save-user-name-btn').addEventListener('click', saveName);
+
+            // 5. Initialisation du focus et des notifications
+            updateFocusDisplay();
+            if (Notification.permission === "granted") {
+                document.getElementById('request-notification-permission-btn').textContent = 'Notifications ACTIVES';
+                document.getElementById('request-notification-permission-btn').disabled = true;
+            } else if (Notification.permission === "denied") {
+                document.getElementById('request-notification-permission-btn').textContent = 'Notifications BLOQUÉES';
+                document.getElementById('request-notification-permission-btn').disabled = true;
+            }
+        });
+    </script>
+
+</body>
+</html>
